@@ -109,7 +109,7 @@ public enum HueResourceArchetype {
     @JsonProperty("up_and_down_down")
     UP_AND_DOWN_DOWN,
     @JsonProperty("hue_floodlight_camera")
-    hue_floodlight_camera,
+    HUE_FLOODLIGHT_CAMERA,
     @JsonProperty("twilight")
     TWILIGHT,
     @JsonProperty("twilight_front")
@@ -118,4 +118,14 @@ public enum HueResourceArchetype {
     TWILIGHT_BACK,
     @JsonProperty("hue_play_wallwasher")
     HUE_PLAY_WALLWASHER,
+    @JsonProperty("hue_omniglow")
+    HUE_OMNIGLOW,
+    @JsonProperty("hue_neon")
+    HUE_NEON,
+    @JsonProperty("string_globe")
+    STRING_GLOBE,
+    @JsonProperty("string_permanent")
+    STRING_PERMANENT,
+
+    ;
 }
