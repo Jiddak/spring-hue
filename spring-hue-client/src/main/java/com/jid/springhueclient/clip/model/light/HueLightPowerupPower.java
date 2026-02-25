@@ -1,0 +1,22 @@
+package com.jid.springhueclient.clip.model.light;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Builder
+public class HueLightPowerupPower {
+
+    @JsonProperty("mode")
+    private HueLightPowerupPowerMode mode;
+
+    @JsonProperty("on")
+    private HueLightState lightState;
+
+
+}
