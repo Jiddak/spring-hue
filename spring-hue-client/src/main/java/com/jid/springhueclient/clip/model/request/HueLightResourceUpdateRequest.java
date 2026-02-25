@@ -22,7 +22,7 @@ public class HueLightResourceUpdateRequest {
     @JsonIgnore
     private String id;
 
-    @JsonProperty("name")
+    @JsonProperty("type")
     private HueResourceType type;
 
     @JsonProperty("metadata")
