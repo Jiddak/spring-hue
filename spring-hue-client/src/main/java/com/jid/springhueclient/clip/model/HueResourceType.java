@@ -21,9 +21,12 @@ public enum HueResourceType {
 
     @JsonProperty("light")
     LIGHT,
-    
+
     @JsonProperty("button")
     BUTTON,
+
+    @JsonProperty("bell_button")
+    BELL_BUTTON,
 
     @JsonProperty("relative_rotary")
     RELATIVE_ROTARY,
@@ -49,6 +52,15 @@ public enum HueResourceType {
     @JsonProperty("tamper")
     TAMPER,
 
+    @JsonProperty("convenience_area_motion")
+    CONVENIENCE_AREA_MOTION,
+
+    @JsonProperty("security_area_motion")
+    SECURITY_AREA_MOTION,
+
+    @JsonProperty("speaker")
+    SPEAKER,
+
     @JsonProperty("grouped_light")
     GROUPED_LIGHT,
 
@@ -56,13 +68,13 @@ public enum HueResourceType {
     GROUPED_MOTION,
 
     @JsonProperty("grouped_light_level")
-    grouped_light_level,
+    GROUPED_LIGHT_LEVEL,
 
     @JsonProperty("device_power")
     DEVICE_POWER,
 
     @JsonProperty("device_software_update")
-    device_software_update,
+    DEVICE_SOFTWARE_UPDATE,
 
     @JsonProperty("zigbee_connectivity")
     ZIGBEE_CONNECTIVITY,
@@ -72,6 +84,12 @@ public enum HueResourceType {
 
     @JsonProperty("bridge")
     BRIDGE,
+
+    @JsonProperty("motion_area_candidate")
+    MOTION_AREA_CANDIDATE,
+
+    @JsonProperty("wifi_connectivity")
+    WIFI_CONNECTIVITY,
 
     @JsonProperty("zigbee_device_discovery")
     ZIGBEE_DEVICE_DISCOVERY,
@@ -112,7 +130,11 @@ public enum HueResourceType {
     @JsonProperty("smart_scene")
     SMART_SCENE,
 
+    @JsonProperty("motion_area_configuration")
+    MOTION_AREA_CONFIGURATION,
+
+    @JsonProperty("clip")
+    CLIP,
+
     ;
-
-
 }

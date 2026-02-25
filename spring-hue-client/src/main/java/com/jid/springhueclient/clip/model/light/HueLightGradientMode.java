@@ -9,6 +9,8 @@ public enum HueLightGradientMode {
     @JsonProperty("interpolated_palette_mirrored")
     INTERPOLATED_PALETTE_MIRRORED,
     @JsonProperty("random_pixelated")
-    RANDOM_PALETTE,
+    RANDOM_PIXELATED,
+    @JsonProperty("segmented_palette")
+    SEGMENTED_PALETTE,
     ;
 }

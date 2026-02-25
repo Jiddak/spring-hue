@@ -65,7 +65,7 @@ public class HueLightResourceUpdateRequest {
     private HueLightEffects effects;
 
     @JsonProperty("effects_v2")
-    private HueLightEffectsV2 effectsDelta;
+    private HueLightEffectsV2 effectsV2;
 
     @JsonProperty("timed_effects")
     private HueLightTimedEffects timedEffects;
@@ -73,5 +73,10 @@ public class HueLightResourceUpdateRequest {
     @JsonProperty("powerup")
     private HueLightPowerup powerup;
 
+    @JsonProperty("content_configuration")
+    private HueLightContentConfiguration contentConfiguration;
+
+    @JsonProperty("geometry")
+    private HueLightGeometry geometry;
 
 }
