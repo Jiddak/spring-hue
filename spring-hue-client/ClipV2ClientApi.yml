@@ -1,0 +1,1855 @@
+openapi: 3.0.3
+
+info:
+  title: Spring Hue Client — CLIP v2 API
+  description: >
+    Java client for the Philips Hue CLIP v2 REST API.
+    Covers light control, room/zone grouping, scene management, and bridge home
+    discovery. All requests require a `hue-application-key` header obtained from
+    the bridge.
+
+    **Security note:** The current implementation uses a trust-all SSL strategy
+    suitable only for development. See `HueClipV2Client` Javadoc for guidance on
+    proper certificate validation in production.
+  version: 0.0.1-SNAPSHOT
+  contact:
+    name: spring-hue
+
+servers:
+  - url: https://{bridgeIp}/clip/v2
+    description: Hue Bridge CLIP v2
+    variables:
+      bridgeIp:
+        default: "192.168.1.1"
+        description: IP address or hostname of the Philips Hue Bridge
+
+security:
+  - HueApplicationKey: []
+
+tags:
+  - name: Light
+    description: Control and query individual light services
+  - name: Room
+    description: Manage rooms — each device belongs to at most one room
+  - name: Zone
+    description: Manage zones — services can belong to multiple zones
+  - name: Bridge Home
+    description: Read-only view of the bridge home grouping
+  - name: Scene
+    description: Store and recall light settings for a group
+
+# ---------------------------------------------------------------------------
+# PATHS
+# ---------------------------------------------------------------------------
+paths:
+
+  # ---------- Light ----------------------------------------------------------
+  /resource/light:
+    get:
+      tags: [Light]
+      operationId: getHueLightResources
+      summary: List all light resources
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueLightResourceResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /resource/light/{id}:
+    get:
+      tags: [Light]
+      operationId: getHueLightResource
+      summary: Get a single light resource by ID
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueLightResourceResponse"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+    put:
+      tags: [Light]
+      operationId: updateHueLightResource
+      summary: Update a light resource
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueLightResourceUpdateRequest"
+            examples:
+              TurnOn:
+                summary: Turn light on at 80% brightness
+                value:
+                  on:
+                    on: true
+                  dimming:
+                    brightness: 80
+              SetColor:
+                summary: Set a warm white color temperature
+                value:
+                  color_temperature:
+                    mirek: 370
+              SetEffect:
+                summary: Apply candle effect
+                value:
+                  effects_v2:
+                    action:
+                      effect: candle
+              DimDown:
+                summary: Dim down by 20%
+                value:
+                  dimming_delta:
+                    action: down
+                    brightness_delta: 20
+      responses:
+        "200":
+          description: Update accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  # ---------- Room -----------------------------------------------------------
+  /resource/room:
+    get:
+      tags: [Room]
+      operationId: getHueRoomResources
+      summary: List all rooms
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueRoomResourceResponse"
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+    post:
+      tags: [Room]
+      operationId: createHueRoomResource
+      summary: Create a new room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueRoomCreateRequest"
+            examples:
+              NewLivingRoom:
+                summary: Create a living room
+                value:
+                  type: room
+                  metadata:
+                    name: Living Room
+                    archetype: living_room
+                  children:
+                    - rid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                      rtype: device
+      responses:
+        "200":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "507": { $ref: "#/components/responses/InsufficientStorage" }
+
+  /resource/room/{id}:
+    put:
+      tags: [Room]
+      operationId: updateHueRoomResource
+      summary: Update a room
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueRoomUpdateRequest"
+      responses:
+        "200":
+          description: Room updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      tags: [Room]
+      operationId: deleteHueRoomResource
+      summary: Delete a room
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Room deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------- Zone -----------------------------------------------------------
+  /resource/zone:
+    get:
+      tags: [Zone]
+      operationId: getHueZoneResources
+      summary: List all zones
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueZoneResourceResponse"
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+    post:
+      tags: [Zone]
+      operationId: createHueZoneResource
+      summary: Create a new zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueZoneCreateRequest"
+      responses:
+        "200":
+          description: Zone created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "507": { $ref: "#/components/responses/InsufficientStorage" }
+
+  /resource/zone/{id}:
+    put:
+      tags: [Zone]
+      operationId: updateHueZoneResource
+      summary: Update a zone
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueZoneUpdateRequest"
+      responses:
+        "200":
+          description: Zone updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      tags: [Zone]
+      operationId: deleteHueZoneResource
+      summary: Delete a zone
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Zone deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------- Bridge Home ----------------------------------------------------
+  /resource/bridge_home:
+    get:
+      tags: [Bridge Home]
+      operationId: getHueBridgeHomeResources
+      summary: List all bridge home resources
+      description: Read-only. Bridge home groups all rooms and unassigned devices.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueBridgeHomeResourceResponse"
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  # ---------- Scene ----------------------------------------------------------
+  /resource/scene:
+    get:
+      tags: [Scene]
+      operationId: getHueSceneResources
+      summary: List all scenes
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueSceneResourceResponse"
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+    post:
+      tags: [Scene]
+      operationId: createHueSceneResource
+      summary: Create a new scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueSceneCreateRequest"
+            examples:
+              EveningScene:
+                summary: Warm dim scene for a room
+                value:
+                  type: scene
+                  metadata:
+                    name: Evening
+                  group:
+                    rid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    rtype: room
+                  actions:
+                    - target:
+                        rid: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                        rtype: light
+                      action:
+                        on:
+                          on: true
+                        dimming:
+                          brightness: 40
+                        color_temperature:
+                          mirek: 454
+      responses:
+        "200":
+          description: Scene created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "507": { $ref: "#/components/responses/InsufficientStorage" }
+
+  /resource/scene/{id}:
+    put:
+      tags: [Scene]
+      operationId: updateHueSceneResource
+      summary: Update or recall a scene
+      description: >
+        Can be used to modify a scene's actions/palette, or to recall (activate)
+        a scene by setting `recall.action`.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HueSceneUpdateRequest"
+            examples:
+              RecallScene:
+                summary: Activate a scene
+                value:
+                  recall:
+                    action: active
+              RecallDynamic:
+                summary: Recall scene in dynamic palette mode
+                value:
+                  recall:
+                    action: dynamic_palette
+      responses:
+        "200":
+          description: Scene updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      tags: [Scene]
+      operationId: deleteHueSceneResource
+      summary: Delete a scene
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Scene deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HueResourceResponse"
+        "404": { $ref: "#/components/responses/NotFound" }
+
+# ---------------------------------------------------------------------------
+# COMPONENTS
+# ---------------------------------------------------------------------------
+components:
+
+  # ---------- Security -------------------------------------------------------
+  securitySchemes:
+    HueApplicationKey:
+      type: apiKey
+      in: header
+      name: hue-application-key
+      description: >
+        API token obtained by POSTing to `/api` on the bridge while the link
+        button is pressed. Pass on every request as the `hue-application-key`
+        header.
+
+  # ---------- Parameters -----------------------------------------------------
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: UUID of the resource
+      schema:
+        type: string
+        pattern: "^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$"
+        example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+  # ---------- Reusable responses ---------------------------------------------
+  responses:
+    BadRequest:
+      description: Bad request — invalid payload or parameter
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid hue-application-key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict with current resource state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit exceeded — retry after a short delay
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: Bridge busy — retry later
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InsufficientStorage:
+      description: Bridge storage full
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  # ---------- Schemas --------------------------------------------------------
+  schemas:
+
+    # ── Primitives / shared ─────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+
+    HueApiError:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Human-readable explanation of the error
+
+    HueResourceOwner:
+      type: object
+      description: Reference to another resource (owner or child)
+      properties:
+        rid:
+          type: string
+          pattern: "^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          description: UUID of the referenced resource
+        rtype:
+          $ref: "#/components/schemas/HueResourceType"
+
+    HueResourceType:
+      type: string
+      description: Type identifier for a Hue resource
+      enum:
+        - device
+        - bridge_home
+        - room
+        - zone
+        - service_group
+        - light
+        - button
+        - bell_button
+        - relative_rotary
+        - temperature
+        - light_level
+        - motion
+        - camera_motion
+        - entertainment
+        - contact
+        - tamper
+        - convenience_area_motion
+        - security_area_motion
+        - speaker
+        - grouped_light
+        - grouped_motion
+        - grouped_light_level
+        - device_power
+        - device_software_update
+        - zigbee_connectivity
+        - zgp_connectivity
+        - bridge
+        - motion_area_candidate
+        - wifi_connectivity
+        - zigbee_device_discovery
+        - homekit
+        - matter
+        - matter_fabric
+        - scene
+        - entertainment_configuration
+        - public_image
+        - auth_v1
+        - behavior_script
+        - behavior_instance
+        - geofence_client
+        - geolocation
+        - smart_scene
+        - motion_area_configuration
+        - clip
+
+    HueResourceMetadata:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Human-readable name
+        archetype:
+          $ref: "#/components/schemas/HueResourceArchetype"
+        fixed_mired:
+          type: integer
+          minimum: 50
+          maximum: 1000
+          description: Fixed mired value for white-only lamps
+        function:
+          $ref: "#/components/schemas/HueLightFunction"
+
+    HueResourceProductData:
+      type: object
+      description: Factory product data for the light service
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        archetype:
+          $ref: "#/components/schemas/HueResourceArchetype"
+        function:
+          $ref: "#/components/schemas/HueLightFunction"
+
+    HueResourceIdentify:
+      type: object
+      description: Trigger a visual identification sequence
+      properties:
+        action:
+          type: string
+          enum: [identify]
+          description: >
+            Triggers a visual identification sequence: bridge performs Zigbee
+            LED cycles for 5 s, lights perform one breathe cycle, sensors cycle
+            for 15 s.
+        duration:
+          type: integer
+          description: Duration in milliseconds for the identify cycle
+          example: 800
+
+    HueResourceArchetype:
+      type: string
+      description: Physical form factor / archetype of the resource
+      enum:
+        - unknown_archetype
+        - classic_bulb
+        - sultan_bulb
+        - flood_bulb
+        - spot_bulb
+        - candle_bulb
+        - luster_bulb
+        - pendant_round
+        - pendant_long
+        - ceiling_round
+        - ceiling_square
+        - floor_shade
+        - floor_lantern
+        - table_shade
+        - recessed_ceiling
+        - recessed_floor
+        - single_spot
+        - double_spot
+        - table_wash
+        - wall_lantern
+        - wall_shade
+        - flexible_lamp
+        - ground_spot
+        - wall_spot
+        - plug
+        - hue_go
+        - hue_lightstrip
+        - hue_iris
+        - hue_bloom
+        - bollard
+        - wall_washer
+        - hue_play
+        - vintage_bulb
+        - vintage_candle_bulb
+        - ellipse_bulb
+        - triangle_bulb
+        - small_globe_bulb
+        - large_globe_bulb
+        - edison_bulb
+        - christmas_tree
+        - string_light
+        - hue_centris
+        - hue_lightstrip_tv
+        - hue_lightstrip_pc
+        - hue_tube
+        - hue_signe
+        - pendant_spot
+        - ceiling_horizontal
+        - ceiling_tube
+        - up_and_down
+        - up_and_down_up
+        - up_and_down_down
+        - hue_floodlight_camera
+        - twilight
+        - twilight_front
+        - twilight_back
+        - hue_play_wallwasher
+        - hue_omniglow
+        - hue_neon
+        - string_globe
+        - string_permanent
+
+    # ── Light shared models ──────────────────────────────────────────────────
+
+    HueLightState:
+      type: object
+      description: On/off state of the light
+      properties:
+        on:
+          type: boolean
+          description: "true = on, false = off"
+      example:
+        on: true
+
+    HueLightDimming:
+      type: object
+      description: Brightness control
+      properties:
+        brightness:
+          type: number
+          format: float
+          maximum: 100
+          description: "Brightness percentage (0 = minimum, 100 = maximum)"
+          example: 80
+        min_dim_level:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Percentage of maximum lumens output at minimum brightness
+      example:
+        brightness: 80
+
+    HueLightDimmingDelta:
+      type: object
+      description: Relative brightness change
+      properties:
+        action:
+          $ref: "#/components/schemas/HueLightDeltaAction"
+        brightness_delta:
+          type: number
+          format: float
+          maximum: 100
+          description: Brightness percentage to add/subtract
+          example: 20
+      example:
+        action: up
+        brightness_delta: 10.5
+
+    HueLightDeltaAction:
+      type: string
+      enum: [up, down, stop]
+      description: Direction of a delta change
+
+    HueLightColorTemperature:
+      type: object
+      description: Color temperature in mirek (mired)
+      properties:
+        mirek:
+          type: integer
+          minimum: 50
+          maximum: 1000
+          description: Color temperature in mirek; null when light is not in CT spectrum
+          example: 233
+        mirek_valid:
+          type: boolean
+          description: Whether the mirek value is currently valid
+        mirek_schema:
+          $ref: "#/components/schemas/HueLightMirekSchema"
+
+    HueLightMirekSchema:
+      type: object
+      description: Supported mirek range for this light
+      properties:
+        mirek_minimum:
+          type: integer
+          minimum: 50
+          maximum: 1000
+          example: 153
+        mirek_maximum:
+          type: integer
+          minimum: 50
+          maximum: 1000
+          example: 500
+
+    HueLightColorTemperatureDelta:
+      type: object
+      description: Relative color temperature change
+      properties:
+        action:
+          $ref: "#/components/schemas/HueLightDeltaAction"
+        mirek_delta:
+          type: integer
+          maximum: 950
+          description: Mirek delta clipped to mirek_minimum / mirek_maximum
+          example: 10
+      example:
+        action: up
+        mirek_delta: 200
+
+    HueLightColor:
+      type: object
+      description: CIE xy color coordinates and gamut information
+      properties:
+        xy:
+          $ref: "#/components/schemas/HueLightGamutCoordinates"
+        gamut:
+          $ref: "#/components/schemas/HueLightRGBGamut"
+        gamut_type:
+          $ref: "#/components/schemas/HueLightGamutType"
+
+    HueLightGamutCoordinates:
+      type: object
+      description: CIE XY gamut position
+      properties:
+        x:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: X position in color gamut
+        y:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Y position in color gamut
+      example:
+        x: 0.369
+        y: 0.445
+
+    HueLightRGBGamut:
+      type: object
+      description: CIE xy vertices for the red, green, and blue primaries
+      properties:
+        red:
+          $ref: "#/components/schemas/HueLightGamutCoordinates"
+        green:
+          $ref: "#/components/schemas/HueLightGamutCoordinates"
+        blue:
+          $ref: "#/components/schemas/HueLightGamutCoordinates"
+
+    HueLightGamutType:
+      type: string
+      description: >
+        Gamut type — A = color-only, B = Hue color, C = Hue white and color,
+        other = non-Hue
+      enum: [A, B, C, other]
+
+    HueLightFunction:
+      type: string
+      enum: [functional, decorative, mixed, unknown]
+      description: Intended use of the light service
+
+    HueLightMode:
+      type: string
+      enum: [normal, streaming]
+      description: Current operating mode of the light
+
+    HueLightDynamics:
+      type: object
+      description: Scene/palette dynamics (speed and transition)
+      properties:
+        duration:
+          type: integer
+          description: Duration of the dynamic transition in milliseconds
+        status:
+          $ref: "#/components/schemas/HueLightDynamicStatus"
+        status_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightDynamicStatus"
+          description: Supported dynamic status values for this light
+        speed:
+          type: number
+          format: float
+          description: Speed of the dynamic palette (0.0–1.0)
+        speed_valid:
+          type: boolean
+          description: Whether the speed value is valid
+
+    HueLightDynamicStatus:
+      type: string
+      enum: [none, dynamic_palette]
+
+    # ── Alert & Signaling ────────────────────────────────────────────────────
+
+    HueLightAlert:
+      type: object
+      description: >
+        Alert information returned in GET responses. Contains the list of
+        supported alert effects for this light.
+      properties:
+        action_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightAlertEffect"
+          description: Alert effects supported by this light
+
+    HueLightAlertPut:
+      type: object
+      description: >
+        Alert payload for PUT requests. Sets the alert action to apply.
+      properties:
+        action:
+          $ref: "#/components/schemas/HueLightAlertEffect"
+
+    HueLightAlertEffect:
+      type: string
+      enum: [breathe]
+      description: Available alert effects
+
+    HueLightSignal:
+      type: object
+      description: Signaling feature — flashing patterns
+      properties:
+        signal:
+          $ref: "#/components/schemas/HueLightSignalType"
+        duration:
+          type: integer
+          description: >
+            Duration in milliseconds (max 65534000, step 1 s).
+            Ignored for no_signal.
+          example: 8000
+        colors:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/HueLightColor"
+          description: Colors to use for the signal (not supported by all signals)
+        signal_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightSignalType"
+          description: Signal types supported by this light (read-only)
+
+    HueLightSignalType:
+      type: string
+      enum: [no_signal, on_off, on_off_color, alternating]
+
+    HueLightSignalStatus:
+      type: object
+      description: Status of the currently active signal
+      properties:
+        signal:
+          $ref: "#/components/schemas/HueLightSignalType"
+        estimated_end:
+          type: string
+          format: date-time
+          description: When the active signal is expected to end
+        colors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightColor"
+
+    # ── Gradient ─────────────────────────────────────────────────────────────
+
+    HueLightGradient:
+      type: object
+      description: Multi-point color gradient across the light
+      properties:
+        points:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/HueGradientPoint"
+          description: >
+            Gradient color stops. PUT requires at least 2 points.
+        mode:
+          $ref: "#/components/schemas/HueLightGradientMode"
+        points_capable:
+          type: boolean
+          description: Maximum number of gradient points supported (read-only)
+        mode_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightGradientMode"
+          description: Gradient modes supported by this light (read-only)
+        pixel_count:
+          type: integer
+          description: Number of pixels in the light strip (read-only)
+
+    HueGradientPoint:
+      type: object
+      properties:
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+
+    HueLightGradientMode:
+      type: string
+      enum:
+        - interpolated_palette
+        - interpolated_palette_mirrored
+        - random_pixelated
+        - segmented_palette
+
+    # ── Effects ──────────────────────────────────────────────────────────────
+
+    HueLightEffect:
+      type: string
+      enum:
+        - no_effect
+        - candle
+        - fire
+        - prism
+        - sparkle
+        - opal
+        - glisten
+        - underwater
+        - cosmos
+        - sunbeam
+        - enchant
+
+    HueLightEffects:
+      deprecated: true
+      type: object
+      description: "Deprecated: use effects_v2"
+      properties:
+        status_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightEffect"
+        status:
+          $ref: "#/components/schemas/HueLightEffect"
+        effect_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightEffect"
+
+    HueLightEffectsV2:
+      type: object
+      description: Effect control (v2)
+      properties:
+        action:
+          $ref: "#/components/schemas/HueLightEffectsV2Action"
+        status:
+          $ref: "#/components/schemas/HueLightEffectsV2Status"
+
+    HueLightEffectsV2Action:
+      type: object
+      description: Write-side of effects_v2 — selects the effect to apply
+      properties:
+        effect:
+          $ref: "#/components/schemas/HueLightEffect"
+        parameters:
+          $ref: "#/components/schemas/HueLightEffectsV2Parameters"
+        effect_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightEffect"
+          description: Effects supported by this light
+
+    HueLightEffectsV2Status:
+      type: object
+      description: Read-side of effects_v2 — currently active effect
+      properties:
+        effect:
+          $ref: "#/components/schemas/HueLightEffect"
+        effect_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightEffect"
+        parameters:
+          $ref: "#/components/schemas/HueLightEffectsV2Parameters"
+
+    HueLightEffectsV2Parameters:
+      type: object
+      description: Optional parameters for an effect
+      properties:
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        speed:
+          type: number
+          format: float
+
+    # ── Timed Effects ─────────────────────────────────────────────────────────
+
+    HueLightTimedEffect:
+      type: string
+      enum: [no_effect, sunrise, sunset]
+
+    HueLightTimedEffects:
+      type: object
+      description: Time-bounded effects (e.g. sunrise alarm)
+      properties:
+        status_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightTimedEffect"
+        status:
+          $ref: "#/components/schemas/HueLightTimedEffect"
+        effect:
+          $ref: "#/components/schemas/HueLightTimedEffect"
+        duration:
+          type: integer
+          description: Duration in milliseconds
+        effect_values:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightTimedEffect"
+
+    # ── Power-up ─────────────────────────────────────────────────────────────
+
+    HueLightPowerup:
+      type: object
+      description: Configures the light behaviour after a power cycle
+      properties:
+        preset:
+          $ref: "#/components/schemas/HueLightPowerupPreset"
+        configured:
+          type: boolean
+          description: Whether a custom power-up has been configured
+        on:
+          $ref: "#/components/schemas/HueLightPowerupPower"
+        dimming:
+          $ref: "#/components/schemas/HueLightPowerupDimming"
+        color:
+          $ref: "#/components/schemas/HueLightPowerupColor"
+
+    HueLightPowerupPreset:
+      type: string
+      enum: [safety, powerfail, last_on_state, custom]
+      description: >
+        safety = always turns on at full brightness; powerfail = restore last
+        state; last_on_state = restore last on state; custom = use additional
+        properties
+
+    HueLightPowerupPower:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/HueLightPowerupPowerMode"
+        on:
+          $ref: "#/components/schemas/HueLightState"
+
+    HueLightPowerupPowerMode:
+      type: string
+      enum: [on, toggle, previous]
+
+    HueLightPowerupDimming:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/HueLightPowerupDimmingMode"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+
+    HueLightPowerupDimmingMode:
+      type: string
+      enum: [dimming, previous]
+
+    HueLightPowerupColor:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/HueLightPowerupColorMode"
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+
+    HueLightPowerupColorMode:
+      type: string
+      enum: [color_temperature, color, previous]
+
+    # ── Content configuration & geometry ─────────────────────────────────────
+
+    HueLightContentConfiguration:
+      type: object
+      description: >
+        Content configuration — returned by GET. Includes read-only status and
+        configurable flags.
+      properties:
+        orientation:
+          $ref: "#/components/schemas/HueLightContentOrientation"
+        order:
+          $ref: "#/components/schemas/HueLightContentOrder"
+
+    HueLightContentConfigurationPut:
+      type: object
+      description: >
+        Content configuration for PUT requests. Only writable fields are included
+        (status and configurable are omitted).
+      properties:
+        orientation:
+          $ref: "#/components/schemas/HueLightContentOrientationPut"
+        order:
+          $ref: "#/components/schemas/HueLightContentOrderPut"
+
+    HueLightContentOrientation:
+      type: object
+      description: Orientation of content on pixelated lights (read model)
+      properties:
+        status:
+          $ref: "#/components/schemas/HueLightContentConfigurableStatus"
+        configurable:
+          type: boolean
+        orientation:
+          $ref: "#/components/schemas/HueLightOrientationDirection"
+
+    HueLightContentOrientationPut:
+      type: object
+      description: Orientation of content on pixelated lights (write model)
+      properties:
+        orientation:
+          $ref: "#/components/schemas/HueLightOrientationDirection"
+
+    HueLightContentOrder:
+      type: object
+      description: Pixel order of content (read model)
+      properties:
+        status:
+          $ref: "#/components/schemas/HueLightContentConfigurableStatus"
+        configurable:
+          type: boolean
+        order:
+          $ref: "#/components/schemas/HueLightOrderDirection"
+
+    HueLightContentOrderPut:
+      type: object
+      description: Pixel order of content (write model)
+      properties:
+        order:
+          $ref: "#/components/schemas/HueLightOrderDirection"
+
+    HueLightContentConfigurableStatus:
+      type: string
+      enum: [set, changing]
+
+    HueLightOrientationDirection:
+      type: string
+      enum: [horizontal, vertical]
+
+    HueLightOrderDirection:
+      type: string
+      enum: [forward, reversed]
+
+    HueLightGeometry:
+      type: object
+      description: Physical pixel positions for gradient/segment lights
+      properties:
+        pixel_positions:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/HueLightPixelPosition"
+
+    HueLightPixelPosition:
+      type: object
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          description: Pixel index (0 for non-gradient lights)
+        position:
+          $ref: "#/components/schemas/HueLightPosition3D"
+
+    HueLightPosition3D:
+      type: object
+      description: 3D position in the Hue coordinate space
+      properties:
+        x:
+          type: number
+          format: float
+        y:
+          type: number
+          format: float
+        z:
+          type: number
+          format: float
+
+    # ── Full light resource ───────────────────────────────────────────────────
+
+    HueLightResource:
+      type: object
+      description: Complete light service resource as returned by GET
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          readOnly: true
+        id_v1:
+          type: string
+          description: CLIP v1 resource path (legacy)
+          readOnly: true
+        owner:
+          $ref: "#/components/schemas/HueResourceOwner"
+        type:
+          type: string
+          enum: [light]
+        metadata:
+          $ref: "#/components/schemas/HueResourceMetadata"
+        product_data:
+          $ref: "#/components/schemas/HueResourceProductData"
+        identify:
+          $ref: "#/components/schemas/HueResourceIdentify"
+        service_id:
+          type: integer
+          minimum: 0
+          description: Service index (0 for single-service devices)
+          readOnly: true
+        on:
+          $ref: "#/components/schemas/HueLightState"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+        dimming_delta:
+          $ref: "#/components/schemas/HueLightDimmingDelta"
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        color_temperature_delta:
+          $ref: "#/components/schemas/HueLightColorTemperatureDelta"
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+        dynamics:
+          $ref: "#/components/schemas/HueLightDynamics"
+        alert:
+          $ref: "#/components/schemas/HueLightAlert"
+        signaling:
+          $ref: "#/components/schemas/HueLightSignal"
+        mode:
+          $ref: "#/components/schemas/HueLightMode"
+        gradient:
+          $ref: "#/components/schemas/HueLightGradient"
+        effects:
+          deprecated: true
+          $ref: "#/components/schemas/HueLightEffects"
+        effects_v2:
+          $ref: "#/components/schemas/HueLightEffectsV2"
+        timed_effects:
+          $ref: "#/components/schemas/HueLightTimedEffects"
+        powerup:
+          $ref: "#/components/schemas/HueLightPowerup"
+
+    HueLightResourceResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueLightResource"
+
+    HueLightResourceUpdateRequest:
+      type: object
+      description: PUT body for updating a light resource
+      properties:
+        type:
+          type: string
+          enum: [light]
+        metadata:
+          $ref: "#/components/schemas/HueResourceMetadata"
+        identify:
+          $ref: "#/components/schemas/HueResourceIdentify"
+        on:
+          $ref: "#/components/schemas/HueLightState"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+        dimming_delta:
+          $ref: "#/components/schemas/HueLightDimmingDelta"
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        color_temperature_delta:
+          $ref: "#/components/schemas/HueLightColorTemperatureDelta"
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+        dynamics:
+          $ref: "#/components/schemas/HueLightDynamics"
+        alert:
+          $ref: "#/components/schemas/HueLightAlertPut"
+        signaling:
+          $ref: "#/components/schemas/HueLightSignal"
+        gradient:
+          $ref: "#/components/schemas/HueLightGradient"
+        effects:
+          deprecated: true
+          $ref: "#/components/schemas/HueLightEffects"
+        effects_v2:
+          $ref: "#/components/schemas/HueLightEffectsV2"
+        timed_effects:
+          $ref: "#/components/schemas/HueLightTimedEffects"
+        powerup:
+          $ref: "#/components/schemas/HueLightPowerup"
+        content_configuration:
+          $ref: "#/components/schemas/HueLightContentConfigurationPut"
+        geometry:
+          $ref: "#/components/schemas/HueLightGeometry"
+
+    # ── Generic response ──────────────────────────────────────────────────────
+
+    HueResourceResponse:
+      type: object
+      description: Generic response containing resource references (returned by POST/PUT/DELETE)
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+
+    # ── Room ──────────────────────────────────────────────────────────────────
+
+    HueRoomArchetype:
+      type: string
+      description: Room type / archetype
+      enum:
+        - living_room
+        - kitchen
+        - dining
+        - bedroom
+        - kids_bedroom
+        - bathroom
+        - nursery
+        - recreation
+        - office
+        - gym
+        - hallway
+        - toilet
+        - front_door
+        - garage
+        - terrace
+        - garden
+        - driveway
+        - carport
+        - home
+        - downstairs
+        - upstairs
+        - top_floor
+        - attic
+        - guest_room
+        - staircase
+        - lounge
+        - man_cave
+        - computer
+        - studio
+        - music
+        - tv
+        - reading
+        - closet
+        - storage
+        - laundry_room
+        - balcony
+        - porch
+        - barbecue
+        - pool
+        - other
+
+    HueRoomMetadata:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        archetype:
+          $ref: "#/components/schemas/HueRoomArchetype"
+
+    HueRoomResource:
+      type: object
+      description: A room grouping devices
+      properties:
+        id:
+          type: string
+          readOnly: true
+        id_v1:
+          type: string
+          readOnly: true
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          description: Device references in this room
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          description: Service references derived from devices in this room
+          readOnly: true
+        type:
+          type: string
+          enum: [room]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    HueRoomResourceResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueRoomResource"
+
+    HueRoomCreateRequest:
+      type: object
+      required: [metadata, children]
+      properties:
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          description: Devices to include in the room
+        type:
+          type: string
+          enum: [room]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    HueRoomUpdateRequest:
+      type: object
+      properties:
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+        type:
+          type: string
+          enum: [room]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    # ── Zone ─────────────────────────────────────────────────────────────────
+
+    HueZoneResource:
+      type: object
+      description: >
+        A zone grouping light services. Unlike rooms, a service can belong to
+        multiple zones.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        id_v1:
+          type: string
+          readOnly: true
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          description: Light service references in this zone
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          readOnly: true
+        type:
+          type: string
+          enum: [zone]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    HueZoneResourceResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueZoneResource"
+
+    HueZoneCreateRequest:
+      type: object
+      required: [metadata]
+      properties:
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+        type:
+          type: string
+          enum: [zone]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    HueZoneUpdateRequest:
+      type: object
+      properties:
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+        type:
+          type: string
+          enum: [zone]
+        metadata:
+          $ref: "#/components/schemas/HueRoomMetadata"
+
+    # ── Bridge Home ───────────────────────────────────────────────────────────
+
+    HueBridgeHomeResource:
+      type: object
+      description: Top-level grouping of all rooms and unassigned devices
+      readOnly: true
+      properties:
+        id:
+          type: string
+          readOnly: true
+        id_v1:
+          type: string
+          readOnly: true
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          readOnly: true
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueResourceOwner"
+          readOnly: true
+        type:
+          type: string
+          enum: [bridge_home]
+          readOnly: true
+
+    HueBridgeHomeResourceResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueBridgeHomeResource"
+
+    # ── Scene ─────────────────────────────────────────────────────────────────
+
+    HueSceneStatus:
+      type: string
+      enum: [inactive, static, dynamic_palette]
+
+    HueSceneRecallAction:
+      type: string
+      enum: [active, dynamic_palette, static]
+
+    HueSceneMetadata:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        image:
+          $ref: "#/components/schemas/HueResourceOwner"
+        appdata:
+          type: string
+          description: Application-specific data stored with the scene
+
+    HueSceneRecall:
+      type: object
+      description: Used to activate or modify scene playback
+      properties:
+        action:
+          $ref: "#/components/schemas/HueSceneRecallAction"
+        duration:
+          type: integer
+          description: Transition duration in milliseconds
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+
+    HueSceneAction:
+      type: object
+      description: A single light action within a scene
+      properties:
+        target:
+          $ref: "#/components/schemas/HueResourceOwner"
+        action:
+          $ref: "#/components/schemas/HueSceneActionBody"
+
+    HueSceneActionBody:
+      type: object
+      description: The state to apply to the target light on scene recall
+      properties:
+        on:
+          $ref: "#/components/schemas/HueLightState"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        gradient:
+          $ref: "#/components/schemas/HueLightGradient"
+        effects:
+          deprecated: true
+          $ref: "#/components/schemas/HueLightEffects"
+        effects_v2:
+          $ref: "#/components/schemas/HueLightEffectsV2"
+        dynamics:
+          $ref: "#/components/schemas/HueLightDynamics"
+
+    HueScenePalette:
+      type: object
+      description: Dynamic palette used when the scene is in dynamic_palette mode
+      properties:
+        color:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueScenePaletteColor"
+        dimming:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueScenePaletteDimming"
+        color_temperature:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueScenePaletteColorTemperature"
+        effects:
+          deprecated: true
+          type: array
+          items:
+            $ref: "#/components/schemas/HueScenePaletteEffect"
+        effects_v2:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueScenePaletteEffectV2"
+
+    HueScenePaletteColor:
+      type: object
+      properties:
+        color:
+          $ref: "#/components/schemas/HueLightColor"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+
+    HueScenePaletteDimming:
+      type: object
+      properties:
+        brightness:
+          type: number
+          format: float
+          maximum: 100
+
+    HueScenePaletteColorTemperature:
+      type: object
+      properties:
+        color_temperature:
+          $ref: "#/components/schemas/HueLightColorTemperature"
+        dimming:
+          $ref: "#/components/schemas/HueLightDimming"
+
+    HueScenePaletteEffect:
+      deprecated: true
+      type: object
+      properties:
+        effect:
+          $ref: "#/components/schemas/HueLightEffect"
+
+    HueScenePaletteEffectV2:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/HueLightEffectsV2Action"
+
+    HueSceneActiveStatus:
+      type: object
+      description: Current activation status of the scene
+      properties:
+        active:
+          $ref: "#/components/schemas/HueSceneStatus"
+        last_recall:
+          type: string
+          format: date-time
+          description: Timestamp of the last time this scene was recalled
+
+    HueSceneResource:
+      type: object
+      description: A complete scene resource
+      properties:
+        id:
+          type: string
+          readOnly: true
+        id_v1:
+          type: string
+          readOnly: true
+        type:
+          type: string
+          enum: [scene]
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueSceneAction"
+        palette:
+          $ref: "#/components/schemas/HueScenePalette"
+        metadata:
+          $ref: "#/components/schemas/HueSceneMetadata"
+        group:
+          $ref: "#/components/schemas/HueResourceOwner"
+        recall:
+          $ref: "#/components/schemas/HueSceneRecall"
+        speed:
+          type: number
+          format: float
+          description: Speed of the dynamic palette (0.0–1.0)
+        auto_dynamic:
+          type: boolean
+          description: Activates dynamic palette mode on recall when true
+        status:
+          $ref: "#/components/schemas/HueSceneActiveStatus"
+
+    HueSceneResourceResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueApiError"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueSceneResource"
+
+    HueSceneCreateRequest:
+      type: object
+      required: [actions, metadata, group]
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueSceneAction"
+        palette:
+          $ref: "#/components/schemas/HueScenePalette"
+        type:
+          type: string
+          enum: [scene]
+        metadata:
+          $ref: "#/components/schemas/HueSceneMetadata"
+        group:
+          $ref: "#/components/schemas/HueResourceOwner"
+        speed:
+          type: number
+          format: float
+        auto_dynamic:
+          type: boolean
+
+    HueSceneUpdateRequest:
+      type: object
+      description: >
+        Update a scene's definition or recall it. Set `recall.action` to activate
+        without changing the scene definition.
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/HueSceneAction"
+        palette:
+          $ref: "#/components/schemas/HueScenePalette"
+        recall:
+          $ref: "#/components/schemas/HueSceneRecall"
+        type:
+          type: string
+          enum: [scene]
+        metadata:
+          $ref: "#/components/schemas/HueSceneMetadata"
+        speed:
+          type: number
+          format: float
+        auto_dynamic:
+          type: boolean
